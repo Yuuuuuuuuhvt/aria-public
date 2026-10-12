@@ -1,0 +1,64 @@
+# Aria 的持续集成. 推送任意分支与拉取请求时, 在 GitHub 托管的 Ubuntu 上运行格式检查, 静态
+# 检查与测试.
+#
+# 工具链版本由仓库的 rust-toolchain.toml 决定, 工作流不写死版本, 避免两处版本漂移.
+#
+# Continuous integration for Aria. It runs the formatting check, the linter and the tests on a
+# GitHub-hosted Ubuntu machine for pushes to any branch and for pull requests.
+#
+# The toolchain version comes from rust-toolchain.toml; the workflow pins nothing so the two
+# cannot drift apart.
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+# 同一分支的新推送取消仍在运行的旧检查, 不浪费额度; 拉取请求的 ref 是 refs/pull/N/merge,
+# 因此每个拉取请求只取消自己的旧运行.
+# A new push to the same branch cancels the older run of that branch. Pull requests use the
+# refs/pull/N/merge ref, so each pull request only cancels its own earlier runs.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# 检查只需要读取仓库内容, 显式声明最小权限, 不继承仓库默认权限.
+# The checks only read the repository, so the minimal permission is declared explicitly
+# instead of inheriting the repository default.
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    # 超时上限只用于兜底, 正常运行的耗时远低于此; 它同时限制异常挂起时的额度消耗.
+    # The timeout is a backstop only, far above the normal duration, and it bounds the quota
+    # a hung run can consume.
+    timeout-minutes: 30
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v5
+
+      # 不带参数的 rustup toolchain install 读取 rust-toolchain.toml, 安装其中固定的工具链
+      # 与组件; 提前安装使后续步骤不再触发下载, 日志中的版本也一目了然.
+      # With no arguments rustup toolchain install reads rust-toolchain.toml and installs the
+      # pinned toolchain and its components. Installing it up front keeps the later steps from
+      # triggering a download and makes the version visible in the log.
+      - name: Install the pinned toolchain
+        run: rustup toolchain install
+
+      - name: Restore the Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-bin: false
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Lint
+        run: cargo clippy --all-targets --locked -- -D warnings
+
+      - name: Test
+        run: cargo test --locked

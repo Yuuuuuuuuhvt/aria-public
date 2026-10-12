@@ -1,0 +1,56 @@
+[workspace]
+resolver = "3"
+members = ["crates/aria-core", "crates/canto", "crates/lyra", "crates/aria"]
+
+[workspace.package]
+version = "0.1.15"
+edition = "2024"
+rust-version = "1.99"
+license = "UNLICENSED"
+publish = false
+
+# 依赖版本集中声明, 各 crate 用 workspace = true 引用, 保证同一依赖只有一个版本.
+# Dependency versions are declared once; crates refer to them with workspace = true.
+[workspace.dependencies]
+aria-core = { path = "crates/aria-core" }
+canto = { path = "crates/canto" }
+lyra = { path = "crates/lyra" }
+# Qoder 网关协议的 AES-128-CBC 加密依赖 aws-lc-sys 后端，显式声明以避免依赖 rustls 间接开启.
+aws-lc-rs = { version = "1.18", default-features = false, features = ["aws-lc-sys"] }
+base64 = "0.23"
+bytes = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+hex = "0.4"
+http = "1"
+http-body = "1"
+http-body-util = "0.1"
+hyper = { version = "1", features = ["http1", "server"] }
+hyper-util = { version = "0.1", features = ["tokio", "server", "http1", "server-graceful"] }
+libc = "0.2"
+md-5 = "0.11"
+pin-project-lite = "0.2"
+rand = "0.10"
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "http2", "stream", "socks"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["raw_value"] }
+sha2 = "0.11"
+subtle = "2"
+tempfile = "3"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "time", "sync", "io-util", "fs"] }
+tokio-io-timeout = "1"
+url = "2"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "warn"
+dbg_macro = "deny"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+panic = "abort"
